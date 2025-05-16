@@ -147,16 +147,37 @@ async function showImage(filepath) {
 
   // Загружаем настройки координат, если есть
   const coords = await window.api.loadCoords(filepath);
-  if (coords && coords.rectImageCorners && coords.userCorners) {
-    rectImageCorners = coords.rectImageCorners;
-    transformMatrix = computeQuadTransform(rectImageCorners, coords.userCorners);
+  if (
+    coords &&
+    typeof coords.image_x0 === 'number' &&
+    typeof coords.image_x1 === 'number' &&
+    typeof coords.image_y0 === 'number' &&
+    typeof coords.image_y1 === 'number' &&
+    typeof coords.user_x0 === 'number' &&
+    typeof coords.user_x1 === 'number' &&
+    typeof coords.user_y0 === 'number' &&
+    typeof coords.user_y1 === 'number'
+  ) {
+    rectImageCorners = [
+      { x: coords.image_x0, y: coords.image_y0 }, // левый нижний
+      { x: coords.image_x1, y: coords.image_y0 }, // правый нижний
+      { x: coords.image_x1, y: coords.image_y1 }, // правый верхний
+      { x: coords.image_x0, y: coords.image_y1 }  // левый верхний
+    ];
+    userCorners = [
+      { x: coords.user_x0, y: coords.user_y0 }, // левый нижний
+      { x: coords.user_x1, y: coords.user_y0 }, // правый нижний
+      { x: coords.user_x1, y: coords.user_y1 }, // правый верхний
+      { x: coords.user_x0, y: coords.user_y1 }  // левый верхний
+    ];
+    transformMatrix = computeQuadTransform(rectImageCorners, userCorners);
     transformActive = true;
     setStatus('Загружены пользовательские координаты');
-    // Заполнить поля модального окна (если нужно)
-    if (coords.y0str) uy0.value = coords.y0str;
-    if (coords.y1str) uy1.value = coords.y1str;
-    if (coords.x0str) ux0.value = coords.x0str;
-    if (coords.x1str) ux1.value = coords.x1str;
+    // Восстановить значения в модальном окне (если нужно)
+    ux0.value = new Date(coords.user_x0).toISOString().slice(0,16);
+    ux1.value = new Date(coords.user_x1).toISOString().slice(0,16);
+    uy0.value = coords.user_y0;
+    uy1.value = coords.user_y1;
   }
 }
 
@@ -470,7 +491,7 @@ setTransformBtn.onclick = () => {
 };
 
 applyTransformBtn.onclick = () => {
-  // Получаем время в миллисекундах, затем в минутах для X
+  // Получаем время в миллисекундах UTC для X
   const xminDate = ux0.value ? new Date(ux0.value) : null;
   const xmaxDate = ux1.value ? new Date(ux1.value) : null;
   const ymin = parseFloat(uy0.value);
@@ -480,9 +501,9 @@ applyTransformBtn.onclick = () => {
     alert('Заполните все координаты!');
     return;
   }
-  // Используем минуты с начала эпохи для X
-  const xmin = Math.floor(xminDate.getTime() / 60000);
-  const xmax = Math.floor(xmaxDate.getTime() / 60000);
+  // Время в миллисекундах UTC
+  const xmin = xminDate.getTime();
+  const xmax = xmaxDate.getTime();
 
   // corners: [левый нижний, правый нижний, правый верхний, левый верхний]
   const userCorners = [
@@ -494,14 +515,20 @@ applyTransformBtn.onclick = () => {
   transformMatrix = computeQuadTransform(rectImageCorners, userCorners);
   transformActive = true;
 
-  // Сохраняем настройки, сохраняем исходные строки дат для удобства
+  // Сохраняем только 4 координаты для image и user
+  const img = rectImageCorners;
+  const usr = userCorners;
   window.api.saveCoords(
     currentImagePath,
     {
-      rectImageCorners,
-      userCorners,
-      x0str: ux0.value,
-      x1str: ux1.value
+      image_x0: img[0].x,
+      image_x1: img[1].x,
+      image_y0: img[0].y,
+      image_y1: img[2].y,
+      user_x0: usr[0].x,
+      user_x1: usr[1].x,
+      user_y0: usr[0].y,
+      user_y1: usr[2].y
     }
   );
 
@@ -517,7 +544,7 @@ cancelTransformBtn.onclick = () => {
 function showUserCoords(imgX, imgY) {
   if (transformActive && transformMatrix) {
     const [uX, uY] = applyQuadTransform(transformMatrix, imgX, imgY);
-    userXField.value = formatDateTimeFromMinutes(uX);
+    userXField.value = formatDateTimeFromMillis(uX);
     userYField.value = uY.toFixed(2);
   } else {
     userXField.value = '';
@@ -525,13 +552,11 @@ function showUserCoords(imgX, imgY) {
   }
 }
 
-// Вспомогательная функция
-function formatDateTimeFromMinutes(mins) {
-  if (!isFinite(mins)) return '';
-  const ms = Math.round(mins) * 60000;
-  const d = new Date(ms);
-  // YYYY-MM-DD HH:mm
+// Новая функция для миллисекунд UTC
+function formatDateTimeFromMillis(ms) {
+  if (!isFinite(ms)) return '';
+  const d = new Date(Math.round(ms));
   const pad = n => n.toString().padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
 }
 
