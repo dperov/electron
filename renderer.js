@@ -8,8 +8,29 @@ const coordX = document.getElementById('coordX');
 const coordY = document.getElementById('coordY');
 const modeMoveBtn = document.getElementById('mode-move');
 const modeRectBtn = document.getElementById('mode-rect');
+const copyRectBtn = document.getElementById('copy-rect');
+const statusLine = document.getElementById('statusline');
+const setTransformBtn = document.getElementById('set-transform');
+const userXField = document.getElementById('userX');
+const userYField = document.getElementById('userY');
+const transformModal = document.getElementById('transform-modal');
+const applyTransformBtn = document.getElementById('apply-transform');
+const cancelTransformBtn = document.getElementById('cancel-transform');
+const ux0 = document.getElementById('ux0'), uy0 = document.getElementById('uy0');
+const ux1 = document.getElementById('ux1'), uy1 = document.getElementById('uy1');
+const ux2 = document.getElementById('ux2'), uy2 = document.getElementById('uy2');
+const ux3 = document.getElementById('ux3'), uy3 = document.getElementById('uy3');
+
+let crosshairDiv = document.createElement('div');
+crosshairDiv.className = 'crosshair-lines';
+crosshairDiv.innerHTML = `<div class="hline"></div><div class="vline"></div>`;
+viewerArea.appendChild(crosshairDiv);
 
 let cursorMode = 'move'; // 'move' | 'rect'
+let transformActive = false;
+let transformMatrix = null;
+let rectImageCorners = null; // [{x,y},...]
+let currentImagePath = null;
 
 modeMoveBtn.onclick = () => setCursorMode('move');
 modeRectBtn.onclick = () => setCursorMode('rect');
@@ -18,6 +39,13 @@ function setCursorMode(mode) {
   cursorMode = mode;
   modeMoveBtn.classList.toggle('active', mode === 'move');
   modeRectBtn.classList.toggle('active', mode === 'rect');
+  copyRectBtn.disabled = mode !== 'rect';
+  setTransformBtn.disabled = mode !== 'rect';
+  if (mode === 'move') {
+    crosshairDiv.style.display = 'block';
+  } else {
+    crosshairDiv.style.display = 'none';
+  }
   // Скрыть прямоугольник выделения во всех imgbox
   if (mode === 'move') {
     tabs.forEach(tab => {
@@ -114,6 +142,18 @@ async function showImage(filepath) {
   activatePanZoom(tabs[tabs.length-1]);
   selectTab(current);
   redrawTabs();
+
+  currentImagePath = filepath;
+
+  // Загружаем настройки координат, если есть
+  const coords = await window.api.loadCoords(filepath);
+  if (coords && coords.rectImageCorners && coords.userCorners) {
+    rectImageCorners = coords.rectImageCorners;
+    transformMatrix = computeQuadTransform(rectImageCorners, coords.userCorners);
+    transformActive = true;
+    setStatus('Загружены пользовательские координаты');
+    // Заполнить поля модального окна (если нужно)
+  }
 }
 
 // 4. Масштаб+drag для каждой картинки
@@ -169,6 +209,27 @@ function activatePanZoom(tab) {
       }
       window.addEventListener('mousemove', onMouseMove);
       window.addEventListener('mouseup', onMouseUp);
+    } else if (cursorMode === 'move' && e.ctrlKey) {
+      tab.drag = true;
+      tab.lastX = e.clientX; tab.lastY = e.clientY;
+      imgbox.style.cursor = 'grabbing';
+      crosshairDiv.style.display = 'none';
+      function onDragMove(ev) {
+        if (!tab.drag) return;
+        tab.offsetX += ev.clientX - tab.lastX;
+        tab.offsetY += ev.clientY - tab.lastY;
+        tab.lastX = ev.clientX;
+        tab.lastY = ev.clientY;
+        updateTransform();
+      }
+      function onDragUp(ev) {
+        tab.drag = false;
+        imgbox.style.cursor = 'grab';
+        window.removeEventListener('mousemove', onDragMove);
+        window.removeEventListener('mouseup', onDragUp);
+      }
+      window.addEventListener('mousemove', onDragMove);
+      window.addEventListener('mouseup', onDragUp);
     } else {
       // --- Обычный режим перемещения ---
       tab.drag = true;
@@ -207,6 +268,9 @@ function activatePanZoom(tab) {
     rectSelect.style.top = (y0 * tab.scale + rect.top - imgbox.getBoundingClientRect().top) + 'px';
     rectSelect.style.width = ((x1 - x0) * tab.scale) + 'px';
     rectSelect.style.height = ((y1 - y0) * tab.scale) + 'px';
+    // Сохраняем выделение
+    lastRectSelection = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    lastRectTab = tab;
   }
 
   function handleAutoScroll(e, tab, img, imgbox) {
@@ -256,15 +320,36 @@ function activatePanZoom(tab) {
     // Меняем курсор в зависимости от режима
     if (cursorMode === 'rect') {
       imgbox.style.cursor = 'crosshair';
+    } else if (cursorMode === 'move') {
+      if (e.ctrlKey) {
+        imgbox.style.cursor = 'grab';
+        crosshairDiv.style.display = 'none';
+      } else {
+        imgbox.style.cursor = 'none';
+        crosshairDiv.style.display = 'block';
+      }
     } else {
       imgbox.style.cursor = tab.drag ? 'grabbing' : 'grab';
     }
+    // --- Крестовые линии ---
+    if (cursorMode === 'move' && !e.ctrlKey) {
+      crosshairDiv.style.display = 'block';
+      const rect = viewerArea.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      crosshairDiv.querySelector('.hline').style.top = y + 'px';
+      crosshairDiv.querySelector('.vline').style.left = x + 'px';
+    } else {
+      crosshairDiv.style.display = 'none';
+    }
+    showUserCoords(Number(x), Number(y));
   });
 
   imgbox.addEventListener('mouseleave', () => {
     coordX.value = '';
     coordY.value = '';
     stopAutoScroll();
+    crosshairDiv.style.display = 'none';
   });
 
   imgbox.addEventListener('wheel', (e) => {
@@ -291,10 +376,56 @@ function activatePanZoom(tab) {
   };
 }
 
+// --- Для хранения последнего выделения ---
+let lastRectSelection = null;
+let lastRectTab = null;
+
 // Чтобы картинки не скроллили страницу (suppress дефолт wheel/page scroll)
 window.addEventListener('wheel', (e) => {
   if (e.target.closest('.imgbox')) e.preventDefault();
 }, {passive:false});
+
+// --- Кнопка "Скопировать выделенное" ---
+copyRectBtn.onclick = async () => {
+  if (
+    cursorMode !== 'rect' ||
+    !lastRectSelection ||
+    !lastRectTab ||
+    !lastRectTab.imgbox
+  ) return;
+
+  const img = lastRectTab.imgbox.querySelector('img');
+  const { x, y, w, h } = lastRectSelection;
+  if (w < 1 || h < 1) return;
+
+  const image = new window.Image();
+  image.src = img.src;
+  await new Promise(res => { image.onload = res; });
+
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(w);
+  canvas.height = Math.round(h);
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(image, x, y, w, h, 0, 0, w, h);
+
+  canvas.toBlob(async (blob) => {
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({ [blob.type]: blob })
+      ]);
+      setStatus(`Скопирована область: x=${Math.round(x)}, y=${Math.round(y)}, w=${Math.round(w)}, h=${Math.round(h)}`);
+    } catch (err) {
+      setStatus('Не удалось скопировать выделение в буфер обмена');
+      alert('Не удалось скопировать выделение в буфер обмена: ' + err);
+    }
+  }, 'image/png');
+};
+
+function setStatus(msg) {
+  if (statusLine) {
+    statusLine.textContent = msg || '';
+  }
+}
 
 // Drag'n'drop файлов (не обязательно)
 viewerArea.ondragover = (e)=>{e.preventDefault(); dropZone.style.display="flex";}
@@ -307,3 +438,79 @@ viewerArea.ondrop = async (e)=> {
 dropZone.ondragover = (e)=>e.preventDefault();
 dropZone.ondragleave = (e)=>dropZone.style.display="none";
 dropZone.ondrop = (e)=> { dropZone.style.display="none"; };
+
+// --- Кнопка "Задать преобразование" ---
+setTransformBtn.onclick = () => {
+  if (
+    cursorMode !== 'rect' ||
+    !lastRectSelection ||
+    !lastRectTab ||
+    !lastRectTab.imgbox
+  ) return;
+
+  // corners: [левый нижний, правый нижний, правый верхний, левый верхний]
+  // (Y снизу вверх, X слева направо)
+  const { x, y, w, h } = lastRectSelection;
+  rectImageCorners = [
+    { x: x,     y: y+h }, // левый нижний
+    { x: x+w,   y: y+h }, // правый нижний
+    { x: x+w,   y: y   }, // правый верхний
+    { x: x,     y: y   }  // левый верхний
+  ];
+  // Очистить поля
+  ux0.value = '';
+  ux1.value = '';
+  uy0.value = '';
+  uy1.value = '';
+  transformModal.style.display = 'flex';
+};
+
+applyTransformBtn.onclick = () => {
+  // Считать пользовательские координаты
+  const xmin = parseFloat(ux0.value);
+  const xmax = parseFloat(ux1.value);
+  const ymin = parseFloat(uy0.value);
+  const ymax = parseFloat(uy1.value);
+  if ([xmin, xmax, ymin, ymax].some(v => isNaN(v))) {
+    alert('Заполните все координаты!');
+    return;
+  }
+  // corners: [левый нижний, правый нижний, правый верхний, левый верхний]
+  const userCorners = [
+    { x: xmin, y: ymin }, // левый нижний
+    { x: xmax, y: ymin }, // правый нижний
+    { x: xmax, y: ymax }, // правый верхний
+    { x: xmin, y: ymax }  // левый верхний
+  ];
+  transformMatrix = computeQuadTransform(rectImageCorners, userCorners);
+  transformActive = true;
+
+  // Сохраняем настройки
+  window.api.saveCoords(
+    currentImagePath,
+    {
+      rectImageCorners,
+      userCorners
+    }
+  );
+
+  setStatus('Режим пользовательских координат включён');
+  transformModal.style.display = 'none';
+};
+
+cancelTransformBtn.onclick = () => {
+  transformModal.style.display = 'none';
+};
+
+// --- Пересчёт координат курсора ---
+function showUserCoords(imgX, imgY) {
+  if (transformActive && transformMatrix) {
+    const [uX, uY] = applyQuadTransform(transformMatrix, imgX, imgY);
+    userXField.value = uX.toFixed(2);
+    userYField.value = uY.toFixed(2);
+  } else {
+    userXField.value = '';
+    userYField.value = '';
+  }
+}
+

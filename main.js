@@ -2,6 +2,8 @@ const { app, BrowserWindow, Menu, dialog, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+const SETTINGS_SUFFIX = '.coords.json';
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1200, height: 900,
@@ -59,8 +61,32 @@ function createWindow() {
     const base64 = fs.readFileSync(filepath).toString('base64');
     return `data:image/${ext};base64,${base64}`;
   });
-}
 
+  // IPC: Сохранение пользовательских координат
+  ipcMain.handle('save-coords', async (event, imagePath, coordsObj) => {
+    try {
+      const settingsPath = imagePath + SETTINGS_SUFFIX;
+      fs.writeFileSync(settingsPath, JSON.stringify(coordsObj, null, 2), 'utf8');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  });
+
+  // IPC: Загрузка пользовательских координат
+  ipcMain.handle('load-coords', async (event, imagePath) => {
+    try {
+      const settingsPath = imagePath + SETTINGS_SUFFIX;
+      if (fs.existsSync(settingsPath)) {
+        const data = fs.readFileSync(settingsPath, 'utf8');
+        return JSON.parse(data);
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  });
+}
 
 console.log("Starting...");
 

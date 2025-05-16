@@ -30,6 +30,26 @@
       z-index:10; background:rgba(0,0,0,0.20); color:white; font-size:2em; align-items:center;justify-content:center;
     }
     button {margin-left: 12px;}
+    .crosshair-lines {
+      pointer-events: none;
+      position: absolute;
+      left: 0; top: 0; width: 100%; height: 100%;
+      z-index: 100;
+    }
+    .crosshair-lines .hline, .crosshair-lines .vline {
+      position: absolute;
+      background: #6cf;
+      opacity: 0.7;
+      pointer-events: none;
+    }
+    .crosshair-lines .hline {
+      height: 1px;
+      width: 100%;
+    }
+    .crosshair-lines .vline {
+      width: 1px;
+      height: 100%;
+    }
   </style>
 </head>
 <body>
@@ -40,13 +60,36 @@
     <span>
       <button id="mode-move" class="mode-btn active" title="Перемещение/масштаб (V)">🖐️</button>
       <button id="mode-rect" class="mode-btn" title="Выделение прямоугольника (R)">⬛</button>
+      <button id="copy-rect" class="mode-btn" title="Скопировать выделенное" disabled>📋</button>
+      <button id="set-transform" class="mode-btn" title="Задать преобразование" disabled>↔️</button>
     </span>
     <span>X: <input id="coordX" type="text" readonly style="width:60px;background:#333;color:#fff;border:none;padding:2px 6px;"></span>
     <span>Y: <input id="coordY" type="text" readonly style="width:60px;background:#333;color:#fff;border:none;padding:2px 6px;"></span>
+    <span>UserX: <input id="userX" type="text" readonly style="width:70px;background:#333;color:#8fd;border:none;padding:2px 6px;"></span>
+    <span>UserY: <input id="userY" type="text" readonly style="width:70px;background:#333;color:#8fd;border:none;padding:2px 6px;"></span>
   </div>
   <div id="tabs"></div>
   <div id="viewerArea"></div>
   <div id="dropzone">Сбросьте файлы сюда…</div>
+  <div id="transform-modal" style="display:none;position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:1000;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;">
+    <div style="background:#222;padding:24px 32px;border-radius:10px;box-shadow:0 0 20px #000;min-width:320px;">
+      <h3 style="color:#fff;">Задать пользовательские координаты</h3>
+      <div style="color:#fff;margin-bottom:10px;">
+        Введите границы пользовательских координат для выделенного прямоугольника:<br>
+        (координаты направлены слева направо и снизу вверх)
+      </div>
+      <table style="color:#fff;margin-bottom:10px;">
+        <tr><td></td><td>Значение</td></tr>
+        <tr><td>Горизонталь начало (X<sub>min</sub>)</td><td><input id="ux0" style="width:80px"></td></tr>
+        <tr><td>Горизонталь конец (X<sub>max</sub>)</td><td><input id="ux1" style="width:80px"></td></tr>
+        <tr><td>Вертикаль начало (Y<sub>min</sub>)</td><td><input id="uy0" style="width:80px"></td></tr>
+        <tr><td>Вертикаль конец (Y<sub>max</sub>)</td><td><input id="uy1" style="width:80px"></td></tr>
+      </table>
+      <button id="apply-transform">Применить</button>
+      <button id="cancel-transform">Отмена</button>
+    </div>
+  </div>
+  <script src="quad-transform.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>
