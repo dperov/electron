@@ -65,7 +65,7 @@
     </span>
     <span>X: <input id="coordX" type="text" readonly style="width:60px;background:#333;color:#fff;border:none;padding:2px 6px;"></span>
     <span>Y: <input id="coordY" type="text" readonly style="width:60px;background:#333;color:#fff;border:none;padding:2px 6px;"></span>
-    <span>UserX: <input id="userX" type="text" readonly style="width:70px;background:#333;color:#8fd;border:none;padding:2px 6px;"></span>
+    <span>UserX: <input id="userX" type="text" readonly style="width:130px;background:#333;color:#8fd;border:none;padding:2px 6px;"></span>
     <span>UserY: <input id="userY" type="text" readonly style="width:70px;background:#333;color:#8fd;border:none;padding:2px 6px;"></span>
   </div>
   <div id="tabs"></div>
@@ -80,10 +80,14 @@
       </div>
       <table style="color:#fff;margin-bottom:10px;">
         <tr><td></td><td>Значение</td></tr>
-        <tr><td>Горизонталь начало (X<sub>min</sub>)</td><td><input id="ux0" style="width:80px"></td></tr>
-        <tr><td>Горизонталь конец (X<sub>max</sub>)</td><td><input id="ux1" style="width:80px"></td></tr>
-        <tr><td>Вертикаль начало (Y<sub>min</sub>)</td><td><input id="uy0" style="width:80px"></td></tr>
-        <tr><td>Вертикаль конец (Y<sub>max</sub>)</td><td><input id="uy1" style="width:80px"></td></tr>
+        <tr><td>Горизонталь начало (X<sub>min</sub>)</td>
+            <td><input id="ux0" type="datetime-local" style="width:170px"></td></tr>
+        <tr><td>Горизонталь конец (X<sub>max</sub>)</td>
+            <td><input id="ux1" type="datetime-local" style="width:170px"></td></tr>
+        <tr><td>Вертикаль начало (Y<sub>min</sub>)</td>
+            <td><input id="uy0" style="width:80px"></td></tr>
+        <tr><td>Вертикаль конец (Y<sub>max</sub>)</td>
+            <td><input id="uy1" style="width:80px"></td></tr>
       </table>
       <button id="apply-transform">Применить</button>
       <button id="cancel-transform">Отмена</button>

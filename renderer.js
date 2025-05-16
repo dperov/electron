@@ -153,6 +153,10 @@ async function showImage(filepath) {
     transformActive = true;
     setStatus('Загружены пользовательские координаты');
     // Заполнить поля модального окна (если нужно)
+    if (coords.y0str) uy0.value = coords.y0str;
+    if (coords.y1str) uy1.value = coords.y1str;
+    if (coords.x0str) ux0.value = coords.x0str;
+    if (coords.x1str) ux1.value = coords.x1str;
   }
 }
 
@@ -466,15 +470,20 @@ setTransformBtn.onclick = () => {
 };
 
 applyTransformBtn.onclick = () => {
-  // Считать пользовательские координаты
-  const xmin = parseFloat(ux0.value);
-  const xmax = parseFloat(ux1.value);
+  // Получаем время в миллисекундах, затем в минутах для X
+  const xminDate = ux0.value ? new Date(ux0.value) : null;
+  const xmaxDate = ux1.value ? new Date(ux1.value) : null;
   const ymin = parseFloat(uy0.value);
   const ymax = parseFloat(uy1.value);
-  if ([xmin, xmax, ymin, ymax].some(v => isNaN(v))) {
+
+  if ([ymin, ymax].some(v => isNaN(v)) || !xminDate || !xmaxDate || isNaN(xminDate.getTime()) || isNaN(xmaxDate.getTime())) {
     alert('Заполните все координаты!');
     return;
   }
+  // Используем минуты с начала эпохи для X
+  const xmin = Math.floor(xminDate.getTime() / 60000);
+  const xmax = Math.floor(xmaxDate.getTime() / 60000);
+
   // corners: [левый нижний, правый нижний, правый верхний, левый верхний]
   const userCorners = [
     { x: xmin, y: ymin }, // левый нижний
@@ -485,12 +494,14 @@ applyTransformBtn.onclick = () => {
   transformMatrix = computeQuadTransform(rectImageCorners, userCorners);
   transformActive = true;
 
-  // Сохраняем настройки
+  // Сохраняем настройки, сохраняем исходные строки дат для удобства
   window.api.saveCoords(
     currentImagePath,
     {
       rectImageCorners,
-      userCorners
+      userCorners,
+      x0str: ux0.value,
+      x1str: ux1.value
     }
   );
 
@@ -506,11 +517,21 @@ cancelTransformBtn.onclick = () => {
 function showUserCoords(imgX, imgY) {
   if (transformActive && transformMatrix) {
     const [uX, uY] = applyQuadTransform(transformMatrix, imgX, imgY);
-    userXField.value = uX.toFixed(2);
+    userXField.value = formatDateTimeFromMinutes(uX);
     userYField.value = uY.toFixed(2);
   } else {
     userXField.value = '';
     userYField.value = '';
   }
+}
+
+// Вспомогательная функция
+function formatDateTimeFromMinutes(mins) {
+  if (!isFinite(mins)) return '';
+  const ms = Math.round(mins) * 60000;
+  const d = new Date(ms);
+  // YYYY-MM-DD HH:mm
+  const pad = n => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
