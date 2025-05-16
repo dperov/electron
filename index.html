@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>КартинкоViewer Tabs</title>
+  <style>
+    html, body {height: 100%; margin:0; padding:0; background:#171717; overflow:hidden;}
+    #topbar {padding:8px; background:#2a2a2a; color:#fff;}
+    #tabs {display: flex; background: #232323;}
+    .tab {
+      padding: 8px 14px; cursor:pointer; background:#333; color:#fff;
+      border-right:1px solid #444; user-select:none;
+      position:relative;
+    }
+    .tab.active {background:#444;}
+    .tab .tab-close {
+      position:absolute;top:3px;right:6px; color:#ccc;font-weight:bold;cursor:pointer;
+    }
+    #addtab {font-weight:bold;padding:8px 13px;}
+    #viewerArea { width: 100vw; height: 90vh; position: relative; background: #171717;}
+    .imgbox {
+      display:none;
+      position:absolute; left:0; top:0; width:100%; height:100%; cursor:grab;
+      overflow:hidden;
+    }
+    .imgbox.active {display:block;}
+    .imgbox img {user-select:none; pointer-events:none; will-change:transform;}
+    #dropzone {
+      position:absolute;left:0;top:0;width:100vw;height:100vh;display:none;
+      z-index:10; background:rgba(0,0,0,0.20); color:white; font-size:2em; align-items:center;justify-content:center;
+    }
+    button {margin-left: 12px;}
+  </style>
+</head>
+<body>
+  <div id="topbar">
+    <button onclick="openImage()">Открыть файл</button>
+  </div>
+  <div id="statusbar" style="padding:8px;background:#222;color:#fff;display:flex;gap:20px;align-items:center;">
+    <span>
+      <button id="mode-move" class="mode-btn active" title="Перемещение/масштаб (V)">🖐️</button>
+      <button id="mode-rect" class="mode-btn" title="Выделение прямоугольника (R)">⬛</button>
+    </span>
+    <span>X: <input id="coordX" type="text" readonly style="width:60px;background:#333;color:#fff;border:none;padding:2px 6px;"></span>
+    <span>Y: <input id="coordY" type="text" readonly style="width:60px;background:#333;color:#fff;border:none;padding:2px 6px;"></span>
+  </div>
+  <div id="tabs"></div>
+  <div id="viewerArea"></div>
+  <div id="dropzone">Сбросьте файлы сюда…</div>
+  <script src="renderer.js"></script>
+</body>
+</html>
