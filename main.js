@@ -15,6 +15,17 @@ function createWindow() {
 
   win.loadFile('index.html');
 
+  // --- Открытие файла из командной строки ---
+  // process.argv[1] — путь к main.js, process.argv[2] — первый пользовательский аргумент
+  const imageArg = process.argv.slice(1).find(arg =>
+    /\.(png|jpg|jpeg|gif|bmp)$/i.test(arg)
+  );
+  if (imageArg && fs.existsSync(imageArg)) {
+    win.webContents.once('did-finish-load', () => {
+      win.webContents.send('load-image', imageArg);
+    });
+  }
+
   // Меню "Открыть файл"
   const template = [
     {
