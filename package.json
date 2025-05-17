@@ -1,6 +1,6 @@
 {
   "name": "electron-img-viewer",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -18,6 +18,38 @@
     ],
     "win": {
       "target": "nsis"
-    }
+    },
+    "fileAssociations": [
+      {
+        "ext": "png",
+        "name": "PNG Image",
+        "description": "PNG Image File",
+        "role": "Viewer"
+      },
+      {
+        "ext": "jpg",
+        "name": "JPEG Image",
+        "description": "JPEG Image File",
+        "role": "Viewer"
+      },
+      {
+        "ext": "jpeg",
+        "name": "JPEG Image",
+        "description": "JPEG Image File",
+        "role": "Viewer"
+      },
+      {
+        "ext": "bmp",
+        "name": "Bitmap Image",
+        "description": "Bitmap Image File",
+        "role": "Viewer"
+      },
+      {
+        "ext": "gif",
+        "name": "GIF Image",
+        "description": "GIF Image File",
+        "role": "Viewer"
+      }
+    ]
   }
 }

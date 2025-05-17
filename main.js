@@ -99,7 +99,5 @@ function createWindow() {
   });
 }
 
-console.log("Starting...");
-
 app.whenReady().then(createWindow);
 

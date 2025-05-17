@@ -208,7 +208,7 @@ function activatePanZoom(tab) {
 
       rectStart = {
         x: (e.clientX - rect.left) / tab.scale,
-        y: (e.clientY - rect.top) / tab.scale
+        y: (rect.bottom - e.clientY) / tab.scale // исправлено!
       };
 
       if (!rectSelect) {
@@ -282,18 +282,24 @@ function activatePanZoom(tab) {
 
   function updateRect(e) {
     const rect = img.getBoundingClientRect();
+    // X — слева направо, Y — снизу вверх!
     const x = (e.clientX - rect.left) / tab.scale;
-    const y = (e.clientY - rect.top) / tab.scale;
-    const x0 = Math.max(0, Math.min(rectStart.x, x));
-    const y0 = Math.max(0, Math.min(rectStart.y, y));
-    const x1 = Math.max(0, Math.max(rectStart.x, x));
-    const y1 = Math.max(0, Math.max(rectStart.y, y));
+    const y = (rect.bottom - e.clientY) / tab.scale;
+
+    // rectStart.x/y — координаты начала выделения (в той же системе)
+    const x0 = Math.min(rectStart.x, x);
+    const y0 = Math.min(rectStart.y, y);
+    const x1 = Math.max(rectStart.x, x);
+    const y1 = Math.max(rectStart.y, y);
+
     // Преобразуем координаты в px относительно imgbox
     rectSelect.style.left = (x0 * tab.scale + rect.left - imgbox.getBoundingClientRect().left) + 'px';
-    rectSelect.style.top = (y0 * tab.scale + rect.top - imgbox.getBoundingClientRect().top) + 'px';
+    // top: отступаем от верхней границы imgbox на (высота - y1)
+    rectSelect.style.top = ((rect.bottom - y1 * tab.scale) - imgbox.getBoundingClientRect().top) + 'px';
     rectSelect.style.width = ((x1 - x0) * tab.scale) + 'px';
     rectSelect.style.height = ((y1 - y0) * tab.scale) + 'px';
-    // Сохраняем выделение
+
+    // Сохраняем выделение в новой системе координат
     lastRectSelection = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
     lastRectTab = tab;
   }
@@ -326,18 +332,19 @@ function activatePanZoom(tab) {
   }
 
   imgbox.addEventListener('mousemove', (e) => {
-    // Получаем координаты мыши относительно imgbox
     const rect = img.getBoundingClientRect();
-    // Координаты мыши относительно левого верхнего угла картинки
-    const x = ((e.clientX - rect.left) / tab.scale).toFixed(1);
-    const y = ((e.clientY - rect.top) / tab.scale).toFixed(1);
+    // Координаты мыши относительно картинки
+    const x = ((e.clientX - rect.left) / tab.scale);
+    // Инвертируем Y: снизу вверх
+    const y = ((rect.bottom - e.clientY) / tab.scale);
+
     // Проверяем, что курсор действительно над картинкой
     if (
       e.clientX >= rect.left && e.clientX <= rect.right &&
       e.clientY >= rect.top && e.clientY <= rect.bottom
     ) {
-      coordX.value = x;
-      coordY.value = y;
+      coordX.value = x.toFixed(1);
+      coordY.value = y.toFixed(1);
     } else {
       coordX.value = '';
       coordY.value = '';
