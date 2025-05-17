@@ -298,7 +298,7 @@ function activatePanZoom(tab) {
           (Math.abs(currentLine.x1 - currentLine.x0) > 1 ||
            Math.abs(currentLine.y1 - currentLine.y0) > 1)
         ) {
-          lines.push({ ...currentLine });
+          lines.push({ ...currentLine, color: currentLineColor }); // сохраняем цвет
           setStatusMsg(
             `Нарисована линия: x₀=${currentLine.x0.toFixed(1)}, y₀=${currentLine.y0.toFixed(1)} — x₁=${currentLine.x1.toFixed(1)}, y₁=${currentLine.y1.toFixed(1)}`
           );
@@ -591,6 +591,7 @@ function redrawLines() {
     ctx.lineWidth = 2;
     lines.filter(l => l.tabIdx === idx).forEach(l => {
       ctx.beginPath();
+      ctx.strokeStyle = l.color || "#ff6";
       ctx.moveTo(l.x0, l.y0);
       ctx.lineTo(l.x1, l.y1);
       ctx.stroke();
@@ -598,7 +599,7 @@ function redrawLines() {
 
     // --- Текущая линия ---
     if (currentLine && currentLine.tabIdx === idx) {
-      ctx.strokeStyle = '#6cf';
+      ctx.strokeStyle = currentLineColor;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(currentLine.x0, currentLine.y0);
@@ -764,4 +765,31 @@ function formatDateTimeFromMillis(ms) {
   const d = new Date(Math.round(ms));
   const pad = n => n.toString().padStart(2, '0');
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+}
+
+let currentLineColor = "#ff6"; // цвет по умолчанию
+
+// Палитра цветов
+const palette = document.getElementById('color-palette');
+if (palette) {
+  palette.addEventListener('click', (e) => {
+    const swatch = e.target.closest('.color-swatch');
+    if (swatch) {
+      // Снять выделение со всех
+      palette.querySelectorAll('.color-swatch').forEach(el => el.classList.remove('selected'));
+      // Выделить выбранный
+      swatch.classList.add('selected');
+      currentLineColor = swatch.dataset.color;
+
+      // Перейти в режим рисования линии
+      drawMode = 'line';
+      cursorMode = null;
+      toolLineBtn.classList.add('active');
+      modeMoveBtn.classList.remove('active');
+      modeRectBtn.classList.remove('active');
+      updateStatusMode();
+    }
+  });
+  // Выделить первый цвет по умолчанию
+  palette.querySelector('.color-swatch').classList.add('selected');
 }
