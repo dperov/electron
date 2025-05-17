@@ -20,7 +20,8 @@
     #viewerArea { width: 100vw; height: 90vh; position: relative; background: #171717;}
     .imgbox {
       display:none;
-      position:absolute; left:0; top:0; width:100%; height:100%; cursor:grab;
+      position:relative; /* изменено с absolute на relative для корректного позиционирования overlay-canvas */
+      left:0; top:0; width:100%; height:100%; cursor:grab;
       overflow:hidden;
     }
     .imgbox.active {display:block;}
@@ -50,9 +51,30 @@
       width: 1px;
       height: 100%;
     }
+    #toolpanel {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 56px;
+      height: 100vh;
+      background: #232323;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      z-index: 200;
+      border-right: 1px solid #333;
+    }
+    body {
+      padding-left: 56px; /* чтобы контент не перекрывался панелью */
+    }
   </style>
 </head>
 <body>
+  <!-- Панель инструментов слева -->
+  <div id="toolpanel">
+    <button id="tool-line" title="Рисовать линию" style="width:40px;height:40px;margin:8px 0;">/</button>
+    <button id="tool-clear" title="Удалить всё" style="width:40px;height:40px;margin:8px 0;">🗑️</button>
+  </div>
   <div id="topbar">
     <button onclick="openImage()">Открыть файл</button>
   </div>
@@ -62,6 +84,7 @@
       <button id="mode-rect" class="mode-btn" title="Выделение прямоугольника (R)">⬛</button>
       <button id="copy-rect" class="mode-btn" title="Скопировать выделенное" disabled>📋</button>
       <button id="set-transform" class="mode-btn" title="Задать преобразование" disabled>↔️</button>
+      <button id="mode-debug" class="mode-btn" title="Отладка SVG-слоя">🐞</button>
     </span>
     <span>X: <input id="coordX" type="text" readonly style="width:60px;background:#333;color:#fff;border:none;padding:2px 6px;"></span>
     <span>Y: <input id="coordY" type="text" readonly style="width:60px;background:#333;color:#fff;border:none;padding:2px 6px;"></span>
@@ -92,6 +115,10 @@
       <button id="apply-transform">Применить</button>
       <button id="cancel-transform">Отмена</button>
     </div>
+  </div>
+  <div id="statusline" style="position:fixed;left:0;bottom:0;width:100vw;height:28px;z-index:500;background:#181818;color:#fff;display:flex;align-items:center;font-size:15px;border-top:1px solid #333;">
+    <span id="status-mode" style="min-width:140px;padding-left:18px;font-weight:bold;"></span>
+    <span id="status-msg" style="flex:1;padding-left:24px;white-space:pre;"></span>
   </div>
   <script src="quad-transform.js"></script>
   <script src="renderer.js"></script>

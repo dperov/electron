@@ -21,6 +21,29 @@ const ux1 = document.getElementById('ux1'), uy1 = document.getElementById('uy1')
 const ux2 = document.getElementById('ux2'), uy2 = document.getElementById('uy2');
 const ux3 = document.getElementById('ux3'), uy3 = document.getElementById('uy3');
 
+const toolLineBtn = document.getElementById('tool-line');
+const toolClearBtn = document.getElementById('tool-clear');
+
+const statusMode = document.getElementById('status-mode');
+const statusMsg = document.getElementById('status-msg');
+
+const modeDebugBtn = document.getElementById('mode-debug');
+let imgHidden = false;
+
+modeDebugBtn.onclick = () => {
+  imgHidden = !imgHidden;
+  modeDebugBtn.classList.toggle('active', imgHidden);
+  modeDebugBtn.title = imgHidden ? 'Показать картинку' : 'Отладка SVG-слоя';
+  tabs.forEach(tab => {
+    const img = tab.imgbox.querySelector('img');
+    if (img) img.style.display = imgHidden ? 'none' : '';
+  });
+};
+
+let drawMode = null; // null | 'line'
+let lines = []; // [{tabIdx, x0, y0, x1, y1}]
+let currentLine = null;
+
 let crosshairDiv = document.createElement('div');
 crosshairDiv.className = 'crosshair-lines';
 crosshairDiv.innerHTML = `<div class="hline"></div><div class="vline"></div>`;
@@ -35,8 +58,28 @@ let currentImagePath = null;
 modeMoveBtn.onclick = () => setCursorMode('move');
 modeRectBtn.onclick = () => setCursorMode('rect');
 
+toolLineBtn.onclick = () => {
+  drawMode = 'line';
+  cursorMode = null; // явно, чтобы не было конфликтов
+  toolLineBtn.classList.add('active');
+  modeMoveBtn.classList.remove('active');
+  modeRectBtn.classList.remove('active');
+  updateStatusMode();
+};
+
+toolClearBtn.onclick = () => {
+  lines = [];
+  redrawLines();
+  setCursorMode('move');
+  drawMode = null;
+  toolLineBtn.classList.remove('active');
+  setStatusMsg('Все линии удалены');
+};
+
 function setCursorMode(mode) {
   cursorMode = mode;
+  drawMode = null;
+  toolLineBtn.classList.remove('active');
   modeMoveBtn.classList.toggle('active', mode === 'move');
   modeRectBtn.classList.toggle('active', mode === 'rect');
   copyRectBtn.disabled = mode !== 'rect';
@@ -53,6 +96,26 @@ function setCursorMode(mode) {
       if (rectDiv) rectDiv.style.display = 'none';
     });
   }
+  updateStatusMode();
+  setStatusMsg(''); // <--- очищаем сообщение при смене режима!
+}
+
+// --- Обновление строки статуса ---
+function updateStatusMode() {
+  let modeStr = '';
+  if (drawMode === 'line') modeStr = 'Рисование линии';
+  else if (cursorMode === 'rect') modeStr = 'Выделение';
+  else modeStr = 'Перемещение';
+  statusMode.textContent = modeStr;
+}
+
+function setStatusMsg(msg) {
+  statusMsg.textContent = msg || '';
+}
+
+// --- Переопределить setStatus для вывода в статусбар ---
+function setStatus(msg) {
+  setStatusMsg(msg);
 }
 
 // Горячие клавиши V и R
@@ -68,7 +131,7 @@ function redrawTabs() {
   tabsDiv.innerHTML = "";
   tabs.forEach((t, idx) => {
     const tab = document.createElement('div');
-    tab.className = 'tab' + (current === idx ? ' active' : '');
+    tab.className = 'tab' + (current === idx ? 'active' : '');
     tab.innerText = t.name;
     const closer = document.createElement('span');
     closer.className = 'tab-close';
@@ -131,6 +194,19 @@ async function showImage(filepath) {
   const img = document.createElement('img');
   img.src = dataurl;
   imgbox.appendChild(img);
+
+  // --- Новый canvas-слой для линий и креста ---
+  const overlay = document.createElement('canvas');
+  overlay.className = 'overlay-canvas';
+  overlay.style.position = 'absolute';
+  overlay.style.left = '0';
+  overlay.style.top = '0';
+  overlay.style.width = '100%';
+  overlay.style.height = '100%';
+  overlay.style.pointerEvents = 'none';
+  overlay.style.zIndex = 30;
+  imgbox.appendChild(overlay);
+
   viewerArea.appendChild(imgbox);
 
   // Сбросить активность прошлых картинок
@@ -172,7 +248,7 @@ async function showImage(filepath) {
     ];
     transformMatrix = computeQuadTransform(rectImageCorners, userCorners);
     transformActive = true;
-    setStatus('Загружены пользовательские координаты');
+    setStatusMsg('Загружены пользовательские координаты');
     // Восстановить значения в модальном окне (если нужно)
     ux0.value = new Date(coords.user_x0).toISOString().slice(0,16);
     ux1.value = new Date(coords.user_x1).toISOString().slice(0,16);
@@ -190,6 +266,7 @@ function activatePanZoom(tab) {
   function updateTransform() {
     img.style.transform = 
       `translate(${tab.offsetX}px,${tab.offsetY}px) scale(${tab.scale})`;
+    redrawLines(); // <-- добавьте этот вызов!
   }
 
   // --- Режим выделения прямоугольника ---
@@ -198,6 +275,42 @@ function activatePanZoom(tab) {
   let autoScrollTimer = null;
 
   imgbox.addEventListener('mousedown', (e) => {
+    if (drawMode === 'line' && e.button === 0 && tabs[current].imgbox === imgbox) {
+      const rect = img.getBoundingClientRect();
+      // SVG-система: X слева направо, Y сверху вниз
+      const x = (e.clientX - rect.left) / tab.scale;
+      const y = (e.clientY - rect.top) / tab.scale;
+      currentLine = { tabIdx: current, x0: x, y0: y, x1: x, y1: y };
+      redrawLines();
+
+      function onMove(ev) {
+        const x2 = (ev.clientX - rect.left) / tab.scale;
+        const y2 = (ev.clientY - rect.top) / tab.scale;
+        currentLine.x1 = x2;
+        currentLine.y1 = y2;
+        redrawLines();
+      }
+      function onUp(ev) {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        if (
+          currentLine &&
+          (Math.abs(currentLine.x1 - currentLine.x0) > 1 ||
+           Math.abs(currentLine.y1 - currentLine.y0) > 1)
+        ) {
+          lines.push({ ...currentLine });
+          setStatusMsg(
+            `Нарисована линия: x₀=${currentLine.x0.toFixed(1)}, y₀=${currentLine.y0.toFixed(1)} — x₁=${currentLine.x1.toFixed(1)}, y₁=${currentLine.y1.toFixed(1)}`
+          );
+        }
+        currentLine = null;
+        redrawLines();
+      }
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+      e.preventDefault();
+      return;
+    }
     if (cursorMode === 'rect') {
       const rect = img.getBoundingClientRect();
       // Проверяем, что клик по картинке
@@ -350,7 +463,9 @@ function activatePanZoom(tab) {
       coordY.value = '';
     }
     // Меняем курсор в зависимости от режима
-    if (cursorMode === 'rect') {
+    if (drawMode === 'line') {
+      imgbox.style.cursor = 'crosshair'; // курсор-точка для рисования линии
+    } else if (cursorMode === 'rect') {
       imgbox.style.cursor = 'crosshair';
     } else if (cursorMode === 'move') {
       if (e.ctrlKey) {
@@ -408,6 +523,92 @@ function activatePanZoom(tab) {
   };
 }
 
+function drawDebugCrossOnImage(img) {
+  // Создаём временный canvas
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth || img.width;
+  canvas.height = img.naturalHeight || img.height;
+  const ctx = canvas.getContext('2d');
+
+  // Рисуем исходное изображение
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  // Рисуем крест-накрест
+  ctx.save();
+  ctx.strokeStyle = 'red';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8, 8]);
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(canvas.width, canvas.height);
+  ctx.moveTo(canvas.width, 0);
+  ctx.lineTo(0, canvas.height);
+  ctx.stroke();
+  ctx.restore();
+
+  // Подменяем src картинки на canvas
+  img.src = canvas.toDataURL();
+}
+
+// --- Функция для отрисовки всех линий на активном imgbox ---
+function redrawLines() {
+  tabs.forEach((tab, idx) => {
+    if (!tab.imgbox.classList.contains('active')) return;
+
+    const img = tab.imgbox.querySelector('img');
+    const overlay = tab.imgbox.querySelector('canvas.overlay-canvas');
+    if (!img || !overlay) return;
+
+    // Установить размеры canvas под картинку
+    overlay.width = img.naturalWidth || img.width;
+    overlay.height = img.naturalHeight || img.height;
+    overlay.style.width = img.width + 'px';
+    overlay.style.height = img.height + 'px';
+
+    // --- ВАЖНО: синхронизировать transform canvas и img ---
+    overlay.style.transform = img.style.transform;
+
+    const ctx = overlay.getContext('2d');
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+    // --- Крест-накрест для отладки ---
+    ctx.save();
+    ctx.strokeStyle = '#f00';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 8]);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(overlay.width, overlay.height);
+    ctx.moveTo(overlay.width, 0);
+    ctx.lineTo(0, overlay.height);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // --- Линии пользователя ---
+    ctx.save();
+    ctx.strokeStyle = '#ff6';
+    ctx.lineWidth = 2;
+    lines.filter(l => l.tabIdx === idx).forEach(l => {
+      ctx.beginPath();
+      ctx.moveTo(l.x0, l.y0);
+      ctx.lineTo(l.x1, l.y1);
+      ctx.stroke();
+    });
+
+    // --- Текущая линия ---
+    if (currentLine && currentLine.tabIdx === idx) {
+      ctx.strokeStyle = '#6cf';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(currentLine.x0, currentLine.y0);
+      ctx.lineTo(currentLine.x1, currentLine.y1);
+      ctx.stroke();
+    }
+    ctx.restore();
+  });
+}
+
 // --- Для хранения последнего выделения ---
 let lastRectSelection = null;
 let lastRectTab = null;
@@ -445,18 +646,16 @@ copyRectBtn.onclick = async () => {
       await navigator.clipboard.write([
         new ClipboardItem({ [blob.type]: blob })
       ]);
-      setStatus(`Скопирована область: x=${Math.round(x)}, y=${Math.round(y)}, w=${Math.round(w)}, h=${Math.round(h)}`);
+      setStatusMsg(`Скопирована область: x=${Math.round(x)}, y=${Math.round(y)}, w=${Math.round(w)}, h=${Math.round(h)}`);
     } catch (err) {
-      setStatus('Не удалось скопировать выделение в буфер обмена');
+      setStatusMsg('Не удалось скопировать выделение в буфер обмена');
       alert('Не удалось скопировать выделение в буфер обмена: ' + err);
     }
   }, 'image/png');
 };
 
 function setStatus(msg) {
-  if (statusLine) {
-    statusLine.textContent = msg || '';
-  }
+  setStatusMsg(msg);
 }
 
 // Drag'n'drop файлов (не обязательно)
@@ -566,4 +765,3 @@ function formatDateTimeFromMillis(ms) {
   const pad = n => n.toString().padStart(2, '0');
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
 }
-
