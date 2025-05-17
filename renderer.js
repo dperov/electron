@@ -571,20 +571,6 @@ function redrawLines() {
     const ctx = overlay.getContext('2d');
     ctx.clearRect(0, 0, overlay.width, overlay.height);
 
-    // --- Крест-накрест для отладки ---
-    ctx.save();
-    ctx.strokeStyle = '#f00';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([8, 8]);
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(overlay.width, overlay.height);
-    ctx.moveTo(overlay.width, 0);
-    ctx.lineTo(0, overlay.height);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.restore();
-
     // --- Линии пользователя ---
     ctx.save();
     ctx.strokeStyle = '#ff6';
