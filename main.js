@@ -22,7 +22,9 @@ function createWindow() {
   );
   if (imageArg && fs.existsSync(imageArg)) {
     win.webContents.once('did-finish-load', () => {
-      win.webContents.send('load-image', imageArg);
+      setTimeout(() => { // небольшой таймаут для полной инициализации
+        win.webContents.send('load-image', imageArg);
+      }, 100);
     });
   }
 
@@ -99,5 +101,6 @@ function createWindow() {
   });
 }
 
+app.disableHardwareAcceleration();
 app.whenReady().then(createWindow);
 

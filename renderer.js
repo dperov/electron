@@ -30,6 +30,9 @@ const statusMsg = document.getElementById('status-msg');
 const modeDebugBtn = document.getElementById('mode-debug');
 let imgHidden = false;
 
+const userWField = document.getElementById('userW');
+const userHField = document.getElementById('userH');
+
 modeDebugBtn.onclick = () => {
   imgHidden = !imgHidden;
   modeDebugBtn.classList.toggle('active', imgHidden);
@@ -289,6 +292,7 @@ function activatePanZoom(tab) {
         currentLine.x1 = x2;
         currentLine.y1 = y2;
         redrawLines();
+        updateUserLineWH(currentLine.x0, currentLine.y0, currentLine.x1, currentLine.y1);
       }
       function onUp(ev) {
         window.removeEventListener('mousemove', onMove);
@@ -398,23 +402,34 @@ function activatePanZoom(tab) {
     // X — слева направо, Y — снизу вверх!
     const x = (e.clientX - rect.left) / tab.scale;
     const y = (rect.bottom - e.clientY) / tab.scale;
-
+  
     // rectStart.x/y — координаты начала выделения (в той же системе)
     const x0 = Math.min(rectStart.x, x);
     const y0 = Math.min(rectStart.y, y);
     const x1 = Math.max(rectStart.x, x);
     const y1 = Math.max(rectStart.y, y);
-
+  
     // Преобразуем координаты в px относительно imgbox
     rectSelect.style.left = (x0 * tab.scale + rect.left - imgbox.getBoundingClientRect().left) + 'px';
-    // top: отступаем от верхней границы imgbox на (высота - y1)
     rectSelect.style.top = ((rect.bottom - y1 * tab.scale) - imgbox.getBoundingClientRect().top) + 'px';
     rectSelect.style.width = ((x1 - x0) * tab.scale) + 'px';
     rectSelect.style.height = ((y1 - y0) * tab.scale) + 'px';
-
+  
     // Сохраняем выделение в новой системе координат
     lastRectSelection = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
     lastRectTab = tab;
+  
+    // --- Заполнение userW и userH ---
+    if (transformActive && transformMatrix) {
+      // corners: левый нижний и правый верхний
+      const [ux0, uy0] = applyQuadTransform(transformMatrix, x0, y0);
+      const [ux1, uy1] = applyQuadTransform(transformMatrix, x1, y1);
+      userWField.value = formatDuration(ux1 - ux0);      // userW = разница по X как длительность
+      userHField.value = Math.abs(uy1 - uy0).toFixed(2); // userH = разница по Y (число)
+    } else {
+      userWField.value = '';
+      userHField.value = '';
+    }
   }
 
   function handleAutoScroll(e, tab, img, imgbox) {
@@ -778,4 +793,26 @@ if (palette) {
   });
   // Выделить первый цвет по умолчанию
   palette.querySelector('.color-swatch').classList.add('selected');
+}
+
+function updateUserLineWH(x0, y0, x1, y1) {
+  if (transformActive && transformMatrix) {
+    const [ux0, uy0] = applyQuadTransform(transformMatrix, x0, y0);
+    const [ux1, uy1] = applyQuadTransform(transformMatrix, x1, y1);
+    userWField.value = formatDuration(ux1 - ux0); // X — время
+    userHField.value = Math.abs(uy1 - uy0).toFixed(2); // Y — число
+  } else {
+    userWField.value = '';
+    userHField.value = '';
+  }
+}
+
+function formatDuration(ms) {
+  if (!isFinite(ms)) return '';
+  let totalMinutes = Math.abs(Math.round(ms / 60000));
+  const days = Math.floor(totalMinutes / (24 * 60));
+  totalMinutes -= days * 24 * 60;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${days}д ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 }
