@@ -2,6 +2,20 @@ const { app, BrowserWindow, Menu, dialog, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+// --- Логирование в файл ---
+const appName = app.getName ? app.getName() : 'electron-img-viewer';
+const logPath = path.join(app.getPath('userData'), `${appName}.log`);
+const logStream = fs.createWriteStream(logPath, { flags: 'a' });
+
+function logToFile(...args) {
+  const msg = args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
+  logStream.write(`[${new Date().toISOString()}] ${msg}\n`);
+}
+
+console.log = logToFile;
+console.warn = logToFile;
+console.error = logToFile;
+
 const SETTINGS_SUFFIX = '.coords.json';
 
 function createWindow() {
