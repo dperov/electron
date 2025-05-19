@@ -269,7 +269,12 @@ function activatePanZoom(tab) {
   function updateTransform() {
     img.style.transform = 
       `translate(${tab.offsetX}px,${tab.offsetY}px) scale(${tab.scale})`;
-    redrawLines(); // <-- добавьте этот вызов!
+    // canvas overlay должен получать тот же transform:
+    const overlay = tab.imgbox.querySelector('canvas.overlay-canvas');
+    if (overlay) {
+        overlay.style.transform = img.style.transform;
+    }
+    redrawLines();
   }
 
   // --- Режим выделения прямоугольника ---
@@ -515,20 +520,27 @@ function activatePanZoom(tab) {
   });
 
   imgbox.addEventListener('wheel', (e) => {
-    console.log("wheel");
     // Масштаб только при зажатом Ctrl!
     if (!e.ctrlKey) return;
     e.preventDefault();
+
+    // Получаем позицию мыши относительно imgbox
+    const rect = imgbox.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    // Переводим в координаты изображения (до масштабирования)
+    const imgX = (mx - tab.offsetX) / tab.scale;
+    const imgY = (my - tab.offsetY) / tab.scale;
+
+    // Меняем масштаб
     const oldScale = tab.scale;
-    if (e.deltaY<0) tab.scale *= 1.07;
+    if (e.deltaY < 0) tab.scale *= 1.07;
     else tab.scale /= 1.07;
     tab.scale = Math.max(0.04, Math.min(tab.scale, 40));
-    //const rect = imgbox.getBoundingClientRect();
-    //let mx = e.clientX-rect.left, my = e.clientY-rect.top;
-    //tab.offsetX = mx - (mx-tab.offsetX)*(tab.scale/oldScale);
-    //tab.offsetY = my - (my-tab.offsetY)*(tab.scale/oldScale);
+
     updateTransform();
-  }, {passive:false});
+}, { passive: false });
 
   img.onload = () => {
     tab.scale = 1;
