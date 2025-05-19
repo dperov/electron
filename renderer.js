@@ -134,7 +134,7 @@ function redrawTabs() {
   tabsDiv.innerHTML = "";
   tabs.forEach((t, idx) => {
     const tab = document.createElement('div');
-    tab.className = 'tab' + (current === idx ? 'active' : '');
+    tab.className = 'tab' + (current === idx ? ' active' : ''); // <-- пробел перед active!
     tab.innerText = t.name;
     const closer = document.createElement('span');
     closer.className = 'tab-close';
