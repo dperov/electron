@@ -37,10 +37,11 @@ modeDebugBtn.onclick = () => {
   imgHidden = !imgHidden;
   modeDebugBtn.classList.toggle('active', imgHidden);
   modeDebugBtn.title = imgHidden ? 'Показать картинку' : 'Отладка SVG-слоя';
-  tabs.forEach(tab => {
-    const img = tab.imgbox.querySelector('img');
-    if (img) img.style.display = imgHidden ? 'none' : '';
-  });
+  //tabs.forEach(tab => {
+  //  const img = tab.imgbox.querySelector('img');
+  //  if (img) img.style.display = imgHidden ? 'none' : '';
+  //});
+  if (tabs[current]) fitUserRectToViewer(tabs[current]);
 };
 
 let drawMode = null; // null | 'line'
@@ -257,6 +258,9 @@ async function showImage(filepath) {
     ux1.value = new Date(coords.user_x1).toISOString().slice(0,16);
     uy0.value = coords.user_y0;
     uy1.value = coords.user_y1;
+
+    // --- ВЫЗОВ ФУНКЦИИ АВТОМАСШТАБИРОВАНИЯ ---
+    fitUserRectToViewer(tabs[current]);
   }
 }
 
@@ -430,7 +434,7 @@ function activatePanZoom(tab) {
       const [ux0, uy0] = applyQuadTransform(transformMatrix, x0, y0);
       const [ux1, uy1] = applyQuadTransform(transformMatrix, x1, y1);
       userWField.value = formatDuration(ux1 - ux0);      // userW = разница по X как длительность
-      userHField.value = Math.abs(uy1 - uy0).toFixed(2); // userH = разница по Y (число)
+      setUserHField(uy0, uy1);                           // userH = разница по Y + %
     } else {
       userWField.value = '';
       userHField.value = '';
@@ -807,12 +811,30 @@ if (palette) {
   palette.querySelector('.color-swatch').classList.add('selected');
 }
 
+/**
+ * Выводит значение userH: абсолютная разница + процент изменения (если возможно)
+ * @param {number} oldVal - начальное значение
+ * @param {number} newVal - конечное значение
+ */
+function setUserHField(oldVal, newVal) {
+  const absDiff = Math.abs(newVal - oldVal);
+  let percent = '';
+  if (Math.abs(oldVal) > 1e-8) {
+    percent = ((absDiff / Math.abs(oldVal)) * 100).toFixed(1) + '%';
+  }
+  userHField.value = absDiff.toFixed(2) + (percent ? ` (${percent})` : '');
+}
+
 function updateUserLineWH(x0, y0, x1, y1) {
   if (transformActive && transformMatrix) {
     const [ux0, uy0] = applyQuadTransform(transformMatrix, x0, y0);
     const [ux1, uy1] = applyQuadTransform(transformMatrix, x1, y1);
-    userWField.value = formatDuration(ux1 - ux0); // X — время
-    userHField.value = Math.abs(uy1 - uy0).toFixed(2); // Y — число
+
+    // userW: разница по X (время)
+    userWField.value = formatDuration(ux1 - ux0);
+
+    // userH: абсолютная разница по Y + процент изменения
+    setUserHField(uy0, uy1);
   } else {
     userWField.value = '';
     userHField.value = '';
@@ -827,4 +849,63 @@ function formatDuration(ms) {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   return `${days}д ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Устанавливает масштаб и позицию так, чтобы пользовательский прямоугольник полностью помещался в окно viewerArea.
+ * rectImageCorners — массив [{x,y}, ...] (левый нижний, правый нижний, правый верхний, левый верхний)
+ * tab — объект текущей вкладки
+ */
+function fitUserRectToViewer(tab) {
+  if (!rectImageCorners || rectImageCorners.length !== 4) return;
+  const img = tab.imgbox.querySelector('img');
+  if (!img) return;
+
+  // Найти границы прямоугольника в координатах изображения
+  const xs = rectImageCorners.map(c => c.x);
+  const ys = rectImageCorners.map(c => c.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+
+  const rectW = maxX - minX;
+  const rectH = maxY - minY;
+
+  // Размеры области просмотра
+  const areaW = viewerArea.clientWidth;
+  const areaH = viewerArea.clientHeight;
+
+  // Вычислить масштаб так, чтобы прямоугольник полностью влезал в viewerArea
+  const scaleX = areaW / rectW;
+  const scaleY = areaH / rectH;
+  const scale = Math.min(scaleX, scaleY);
+
+  // Центр прямоугольника в координатах изображения
+  const rectCenterX = (minX + maxX) / 2;
+  const rectCenterY = (minY + maxY) / 2;
+
+  // Центр области просмотра
+  const areaCenterX = areaW / 2;
+  const areaCenterY = areaH / 2;
+
+  // Смещение: чтобы центр прямоугольника совпал с центром viewerArea
+  tab.scale = scale;
+  //tab.offsetX = areaCenterX - rectCenterX * scale;
+  //tab.offsetY = areaCenterY - rectCenterY * scale;
+
+  // Применить трансформацию
+  if (typeof tab.imgbox.updateTransform === 'function') {
+    tab.imgbox.updateTransform();
+  } else if (typeof tab.updateTransform === 'function') {
+    tab.updateTransform();
+  } else {
+    const img = tab.imgbox.querySelector('img');
+    if (img) {
+      img.style.transform = `translate(${tab.offsetX}px,${tab.offsetY}px) scale(${tab.scale})`;
+      const overlay = tab.imgbox.querySelector('canvas.overlay-canvas');
+      if (overlay) overlay.style.transform = img.style.transform;
+    }
+    redrawLines();
+  }
 }
