@@ -899,7 +899,7 @@ function fitUserRectToViewer(tab) {
   const img = tab.imgbox.querySelector('img');
   if (!img) return;
 
-  // Найти границы прямоугольника в координатах изображения
+  // Границы прямоугольника в координатах изображения
   const xs = rectImageCorners.map(c => c.x);
   const ys = rectImageCorners.map(c => c.y);
   const minX = Math.min(...xs);
@@ -914,23 +914,26 @@ function fitUserRectToViewer(tab) {
   const areaW = viewerArea.clientWidth;
   const areaH = viewerArea.clientHeight;
 
-  // Вычислить масштаб так, чтобы прямоугольник полностью влезал в viewerArea
+  // Масштаб, чтобы прямоугольник полностью влезал в viewerArea
   const scaleX = areaW / rectW;
   const scaleY = areaH / rectH;
   const scale = Math.min(scaleX, scaleY);
 
-  // Центр прямоугольника в координатах изображения
-  const rectCenterX = (minX + maxX) / 2;
-  const rectCenterY = (minY + maxY) / 2;
-
-  // Центр области просмотра
-  const areaCenterX = areaW / 2;
-  const areaCenterY = areaH / 2;
-
-  // Смещение: чтобы центр прямоугольника совпал с центром viewerArea
   tab.scale = scale;
-  //tab.offsetX = areaCenterX - rectCenterX * scale;
-  //tab.offsetY = areaCenterY - rectCenterY * scale;
+
+  // Смещение: левый верхний угол прямоугольника в левый верхний угол viewerArea
+  // Важно: в transform Y направлен вниз, а в координатах изображения Y может быть снизу вверх!
+  // rectImageCorners: [левый нижний, правый нижний, правый верхний, левый верхний]
+  // Для смещения используем minX (левый), maxY (верхний)
+  //tab.offsetX = -minX * scale;
+  //tab.offsetY = -maxY * scale;
+  console.log('tab.offsetX new:', -minX * scale, 'tab.offsetY new', -maxY * scale);
+
+  console.log('tab.offsetX:', tab.offsetX, 'tab.offsetY', tab.offsetY);
+
+  // Если хотите центрировать прямоугольник:
+  //tab.offsetX = (areaW - rectW * scale) / 2 - minX * scale;
+  //tab.offsetY = (areaH - rectH * scale) / 2 - minY * scale;
 
   // Применить трансформацию
   if (typeof tab.imgbox.updateTransform === 'function') {
@@ -946,6 +949,7 @@ function fitUserRectToViewer(tab) {
     }
     redrawLines();
   }
+  console.log('выполнено масштабирование');
 }
 
 const toolFitBtn = document.getElementById('tool-fit');
