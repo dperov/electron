@@ -57,6 +57,7 @@ let cursorMode = 'move'; // 'move' | 'rect'
 let transformActive = false;
 let transformMatrix = null;
 let rectImageCorners = null; // [{x,y},...]
+let userCorners = null;      // <--- добавьте эту строку
 let currentImagePath = null;
 
 modeMoveBtn.onclick = () => setCursorMode('move');
@@ -155,11 +156,19 @@ function redrawTabs() {
 function selectTab(idx) {
   if (idx < 0 || idx >= tabs.length) return;
   tabs.forEach((tab, i) => {
-    tab.imgbox.classList.toggle('active', i===idx);
-    tab.imgbox.style.zIndex = (i===idx) ? 10 : 1;
+    tab.imgbox.classList.toggle('active', i === idx);
+    tab.imgbox.style.zIndex = (i === idx) ? 10 : 1;
   });
   current = idx;
   redrawTabs();
+
+  // --- Подключаем пользовательскую систему координат выбранного таба ---
+  const tab = tabs[idx];
+  rectImageCorners = tab.rectImageCorners ? [...tab.rectImageCorners] : null;
+  userCorners = tab.userCorners ? [...tab.userCorners] : null;
+  transformMatrix = tab.transformMatrix ? { ...tab.transformMatrix } : null;
+  transformActive = !!tab.transformActive;
+  currentImagePath = tab.currentImagePath || null;
 }
 
 function closeTab(idx) {
@@ -217,7 +226,22 @@ async function showImage(filepath) {
   tabs.forEach(tab => { tab.imgbox.classList.remove('active'); });
 
   // Добавить новый таб
-  tabs.push({ name, filepath, imgbox, scale:1, offsetX:0, offsetY:0, drag:false, lastX:0, lastY:0 });
+  tabs.push({
+    name,
+    filepath,
+    imgbox,
+    scale: 1,
+    offsetX: 0,
+    offsetY: 0,
+    drag: false,
+    lastX: 0,
+    lastY: 0,
+    rectImageCorners: rectImageCorners ? [...rectImageCorners] : null,
+    userCorners: userCorners ? [...userCorners] : null,
+    transformMatrix: transformMatrix ? { ...transformMatrix } : null,
+    transformActive: !!transformActive,
+    currentImagePath: filepath
+  });
   current = tabs.length-1;
   activatePanZoom(tabs[tabs.length-1]);
   selectTab(current);
@@ -261,6 +285,13 @@ async function showImage(filepath) {
 
     // --- ВЫЗОВ ФУНКЦИИ АВТОМАСШТАБИРОВАНИЯ ---
     fitUserRectToViewer(tabs[current]);
+
+    const tab = tabs[current]; // <--- добавьте эту строку
+    tab.rectImageCorners = [...rectImageCorners];
+    tab.userCorners = [...userCorners];
+    tab.transformMatrix = { ...transformMatrix };
+    tab.transformActive = true;
+    tab.currentImagePath = filepath;
   }
 }
 
@@ -755,6 +786,13 @@ applyTransformBtn.onclick = () => {
       user_y1: usr[2].y
     }
   );
+
+  const tab = tabs[current];
+  tab.rectImageCorners = [...rectImageCorners];
+  tab.userCorners = [...userCorners];
+  tab.transformMatrix = { ...transformMatrix };
+  tab.transformActive = true;
+  tab.currentImagePath = currentImagePath;
 
   setStatus('Режим пользовательских координат включён');
   transformModal.style.display = 'none';
