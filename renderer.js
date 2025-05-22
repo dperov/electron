@@ -947,3 +947,11 @@ function fitUserRectToViewer(tab) {
     redrawLines();
   }
 }
+
+const toolFitBtn = document.getElementById('tool-fit');
+toolFitBtn.onclick = () => {
+  if (tabs[current]) fitUserRectToViewer(tabs[current]);
+};
+
+const toolOpenBtn = document.getElementById('tool-open');
+toolOpenBtn.onclick = openImage;

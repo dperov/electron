@@ -122,13 +122,12 @@
       <div class="color-swatch" data-color="#000"></div>
     </div>
   </div>
-  <div id="topbar">
-    <button onclick="openImage()">Открыть файл</button>
-  </div>
   <div id="statusbar" style="padding:8px;background:#222;color:#fff;display:flex;gap:20px;align-items:center;">
     <span>
+      <button id="tool-open" class="mode-btn" title="Открыть файл">📂</button>
       <button id="mode-move" class="mode-btn active" title="Перемещение/масштаб (V)">🖐️</button>
       <button id="mode-rect" class="mode-btn" title="Выделение прямоугольника (R)">⬛</button>
+      <button id="tool-fit" class="mode-btn" title="Автомасштабировать пользовательский прямоугольник">⛶</button>
       <button id="copy-rect" class="mode-btn" title="Скопировать выделенное" disabled>📋</button>
       <button id="set-transform" class="mode-btn" title="Задать преобразование" disabled>↔️</button>
       <button id="mode-debug" class="mode-btn" title="Отладка SVG-слоя">🐞</button>
